@@ -6,7 +6,7 @@ Proyecto de Unity 6 con el Universal Render Pipeline (URP).
 
 ## Requisitos
 
-- **Unity 6.5** (rama `6000.5`). La versión exacta está en [`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt).
+- **Unity 6.6** (rama `6000.6`). La versión exacta está en [`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt).
 - **Git LFS**. El repositorio lo usa para imágenes, audio, modelos 3D y otros binarios (ver [`.gitattributes`](.gitattributes)).
 - Un editor de C#: Visual Studio o Rider.
 
