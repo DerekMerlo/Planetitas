@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+  <ui:Style src="AjustesJuegoWindow.uss" />
+  <ui:ScrollView name="root" class="ajustes-root">
+    <ui:Label text="Planetitas · Ajustes del juego" class="title" />
+
+    <ui:VisualElement class="section">
+      <ui:Label text="Salto" class="section-title" />
+      <ui:Slider name="jumpSpeed" label="Fuerza del salto" binding-path="jumpSpeed" low-value="3" high-value="20" show-input-field="true" tooltip="Velocidad vertical del salto base (m/s)." />
+      <ui:Slider name="gravity" label="Gravedad" binding-path="gravity" low-value="5" high-value="40" show-input-field="true" tooltip="Cuánto tira hacia abajo (m/s²)." />
+      <ui:Slider name="impulseGrowth" label="Impulso extra por salto" binding-path="impulseGrowthPerJump" low-value="0" high-value="0.5" show-input-field="true" tooltip="0.12 = cada salto empuja un 12 % más que el anterior." />
+      <ui:Slider name="maxImpulse" label="Impulso máximo (x)" binding-path="maxImpulseMultiplier" low-value="1" high-value="5" show-input-field="true" tooltip="Tope del multiplicador de impulso." />
+      <ui:Label name="jumpInfo" class="info" />
+    </ui:VisualElement>
+
+    <ui:VisualElement class="section">
+      <ui:Label text="Esferas de energía" class="section-title" />
+      <uie:ColorField name="orbColor" label="Color" binding-path="orbColor" show-alpha="false" />
+      <ui:Slider name="orbGlow" label="Brillo" binding-path="orbGlow" low-value="0" high-value="6" show-input-field="true" />
+      <ui:Slider name="startSpacing" label="Distancia inicial (m)" binding-path="startOrbSpacing" low-value="1" high-value="10" show-input-field="true" tooltip="Separación vertical entre esferas al empezar." />
+      <ui:Slider name="maxSpacing" label="Distancia máxima (m)" binding-path="maxOrbSpacing" low-value="1" high-value="15" show-input-field="true" tooltip="La separación crece al subir hasta este valor." />
+      <ui:HelpBox name="startWarning" message-type="Warning" class="warning hidden" />
+      <ui:HelpBox name="maxWarning" message-type="Warning" class="warning hidden" />
+    </ui:VisualElement>
+
+    <ui:VisualElement class="footer">
+      <ui:Label name="footerHint" class="footer-hint" />
+      <ui:Button name="resetButton" text="Restaurar valores por defecto" />
+    </ui:VisualElement>
+  </ui:ScrollView>
+</ui:UXML>

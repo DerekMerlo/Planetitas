@@ -34,18 +34,15 @@ namespace Planetitas
         public float maxDrainPerSecond = 9f;
         public float orbEnergy = 25f;
 
-        [Header("Salto")]
-        public float baseJumpSpeed = 9f;
-        public float impulseGrowthPerJump = 0.12f;   // +12 % de impulso por salto
-        public float maxImpulseMultiplier = 2.5f;
+        [Header("Movimiento")]
         public float impulseDecayPerSecond = 0.12f;  // el impulso extra se pierde si dejas de saltar
-        public float gravity = -18f;
         public float horizontalSpeed = 7f;
         public float arenaHalfWidth = 5.5f;
 
-        [Header("Orbes")]
-        public float startOrbSpacing = 2.5f;
-        public float maxOrbSpacing = 7f;
+        // Salto, gravedad y esferas: se editan en Tools > Planetitas > Ajustes del juego.
+        JumpGameSettings settings;
+        Color appliedOrbColor;
+        float appliedOrbGlow = -1f;
 
         enum State { Ready, Playing, GameOver }
 
@@ -85,12 +82,13 @@ namespace Planetitas
         void Awake()
         {
             bestHeight = PlayerPrefs.GetFloat(BestKey, 0f);
+            settings = JumpGameSettings.LoadOrDefault();
             litShader = Shader.Find("Universal Render Pipeline/Lit");
             if (litShader == null) litShader = Shader.Find("Standard");
 
             playerMat = MakeMat(Palette.Player, 0.25f);
             ringMat = MakeMat(Palette.Ring, 0.6f);
-            orbMat = MakeMat(Palette.Energy, 2.5f);
+            orbMat = MakeMat(settings.orbColor, settings.orbGlow);
             groundMat = MakeMat(Palette.Ground, 0.4f);
             starMat = MakeMat(Palette.Star, 1.5f);
             trailMat = new Material(Shader.Find("Sprites/Default"));
@@ -208,7 +206,7 @@ namespace Planetitas
             playerVisual.localScale = Vector3.one;
             trail.Clear();
             cameraY = 0f;
-            nextOrbY = 2.2f;
+            nextOrbY = settings.startOrbSpacing * 0.88f; // primera esfera algo más cerca
             SpawnAhead();
             PlaceCamera(true);
         }
@@ -235,6 +233,7 @@ namespace Planetitas
                     break;
             }
 
+            ApplyOrbLook();
             AnimateOrbs();
             displayedEnergy = Mathf.Lerp(displayedEnergy, energy, 1f - Mathf.Exp(-12f * dt)); // la barra se anima, no salta
             lowEnergyBlink += dt;
@@ -253,7 +252,7 @@ namespace Planetitas
             multiplier = Mathf.Max(1f, multiplier - impulseDecayPerSecond * dt);
 
             // movimiento
-            velocity.y += gravity * dt;
+            velocity.y -= settings.gravity * dt;
             float targetX = HorizontalInput() * horizontalSpeed;
             velocity.x = Mathf.MoveTowards(velocity.x, targetX, horizontalSpeed * 6f * dt);
             Vector3 p = player.position + new Vector3(velocity.x, velocity.y, 0f) * dt;
@@ -294,8 +293,8 @@ namespace Planetitas
             energy -= jumpCost;
             jumps++;
             grounded = false;
-            multiplier = Mathf.Min(maxImpulseMultiplier, multiplier + impulseGrowthPerJump);
-            velocity.y = baseJumpSpeed * multiplier;
+            multiplier = Mathf.Min(settings.maxImpulseMultiplier, multiplier + settings.impulseGrowthPerJump);
+            velocity.y = settings.jumpSpeed * multiplier;
             sfx.pitch = 0.9f + (multiplier - 1f) * 0.4f; // el sonido sube con el impulso
             sfx.PlayOneShot(jumpClip);
             Pop(new Vector3(0.8f, 1.25f, 0.8f), 0.18f);
@@ -307,7 +306,7 @@ namespace Planetitas
             energy = Mathf.Min(maxEnergy, energy + orbEnergy);
             sfx.pitch = Random.Range(0.92f, 1.08f);
             sfx.PlayOneShot(orbClip);
-            Burst(o.position, Palette.Energy, 10);
+            Burst(o.position, settings.orbColor, 10);
             FloatingText(o.position, "+" + Mathf.RoundToInt(orbEnergy));
             Pop(new Vector3(1.25f, 1.25f, 1.25f), 0.15f);
             Destroy(o.gameObject);
@@ -341,7 +340,7 @@ namespace Planetitas
                 orb.position = new Vector3(Random.Range(-arenaHalfWidth + 0.5f, arenaHalfWidth - 0.5f), nextOrbY, 0f);
                 orbs.Add(orb);
                 // los orbes se separan más cuanto más alto llegas
-                nextOrbY += Mathf.Min(maxOrbSpacing, startOrbSpacing + nextOrbY * 0.02f) * Random.Range(0.85f, 1.15f);
+                nextOrbY += Mathf.Min(Mathf.Max(settings.startOrbSpacing, settings.maxOrbSpacing), settings.startOrbSpacing + nextOrbY * 0.02f) * Random.Range(0.85f, 1.15f);
 
                 for (int i = 0; i < 3; i++)
                 {
@@ -353,6 +352,18 @@ namespace Planetitas
             }
             for (int i = stars.Count - 1; i >= 0; i--)
                 if (stars[i].position.y < cameraY - 20f) { Destroy(stars[i].gameObject); stars.RemoveAt(i); }
+        }
+
+        void ApplyOrbLook()
+        {
+            // aplica en vivo el color y el brillo elegidos en la ventana de ajustes
+            if (settings.orbColor == appliedOrbColor && Mathf.Approximately(settings.orbGlow, appliedOrbGlow)) return;
+            appliedOrbColor = settings.orbColor;
+            appliedOrbGlow = settings.orbGlow;
+            orbMat.SetColor("_BaseColor", appliedOrbColor);
+            orbMat.color = appliedOrbColor;
+            orbMat.EnableKeyword("_EMISSION");
+            orbMat.SetColor("_EmissionColor", appliedOrbColor * appliedOrbGlow);
         }
 
         void AnimateOrbs()
@@ -455,7 +466,7 @@ namespace Planetitas
             tm.anchor = TextAnchor.MiddleCenter;
             tm.fontSize = 64;
             tm.characterSize = 0.06f;
-            tm.color = Palette.Energy;
+            tm.color = settings.orbColor;
             StartCoroutine(FloatRoutine(tm));
         }
 
@@ -465,7 +476,7 @@ namespace Planetitas
             for (float t = 0f; t < 1f; t += Time.deltaTime / 0.6f)
             {
                 tm.transform.position = start + Vector3.up * 0.8f * t;
-                var c = Palette.Energy; c.a = 1f - t;
+                var c = settings.orbColor; c.a = 1f - t;
                 tm.color = c;
                 yield return null;
             }
@@ -641,4 +652,6 @@ namespace Planetitas
         }
     }
 }
+
+
 
