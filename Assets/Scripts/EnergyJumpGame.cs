@@ -15,7 +15,7 @@ namespace Planetitas
         public static readonly Color Energy = Hex(0x5CE1E6);
         public static readonly Color Ground = Hex(0x7B5CFF);
         public static readonly Color Danger = Hex(0xFF4D6D);
-        public static readonly Color Star = Hex(0xF4F1FF);
+        public static readonly Color Star = Hex(0xF4F1FF);  // estrellitas del fondo (decorativas)
         public static readonly Color Panel = new Color(0.04f, 0.03f, 0.10f, 0.65f);
 
         static Color Hex(int rgb) => new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f, 1f);
@@ -23,7 +23,7 @@ namespace Planetitas
 
     /// <summary>
     /// Juego de saltos: cada salto consume energía pero da más impulso que el anterior.
-    /// Recoge orbes para recargar energía. Si la energía llega a cero, pierdes.
+    /// Recoge estrellas de energía para recargar energía. Si la energía llega a cero, pierdes.
     /// </summary>
     public class EnergyJumpGame : MonoBehaviour
     {
@@ -43,6 +43,7 @@ namespace Planetitas
         JumpGameSettings settings;
         Color appliedOrbColor;
         float appliedOrbGlow = -1f;
+        Color appliedSparkleColor;
 
         enum State { Ready, Playing, GameOver }
 
@@ -60,10 +61,12 @@ namespace Planetitas
         int jumps;
         bool grounded;
         string gameOverReason = "";
-        readonly List<Transform> orbs = new List<Transform>();
+        readonly List<Transform> orbs = new List<Transform>();          // estrellas de energía (recogibles)
+        readonly List<ParticleSystem> sparkles = new List<ParticleSystem>(); // destello de cada estrella, mismo índice que orbs
         readonly List<Transform> stars = new List<Transform>();
         Shader litShader;
-        Material playerMat, ringMat, orbMat, groundMat, starMat, trailMat;
+        Material playerMat, ringMat, orbMat, groundMat, starMat, trailMat, sparkleMat;
+        Mesh starMesh;
         AudioSource sfx, ambient;
         AudioClip jumpClip, orbClip, loseClip, clickClip;
         Texture2D white;
@@ -89,9 +92,12 @@ namespace Planetitas
             playerMat = MakeMat(Palette.Player, 0.25f);
             ringMat = MakeMat(Palette.Ring, 0.6f);
             orbMat = MakeMat(settings.orbColor, settings.orbGlow);
+            orbMat.SetFloat("_Smoothness", 0.8f); // acabado brillante, como la referencia de XP-27
             groundMat = MakeMat(Palette.Ground, 0.4f);
-            starMat = MakeMat(Palette.Star, 1.5f);
+            starMat = MakeMat(Palette.Star, 0.6f); // fondo tenue para no confundirse con las estrellas de energía
             trailMat = new Material(Shader.Find("Sprites/Default"));
+            sparkleMat = new Material(trailMat) { mainTexture = SparkleTexture() };
+            starMesh = BuildStarMesh();
 
             white = new Texture2D(1, 1);
             white.SetPixel(0, 0, Color.white);
@@ -192,6 +198,7 @@ namespace Planetitas
         {
             foreach (var o in orbs) Destroy(o.gameObject);
             orbs.Clear();
+            sparkles.Clear();
             foreach (var s in stars) Destroy(s.gameObject);
             stars.Clear();
 
@@ -206,7 +213,7 @@ namespace Planetitas
             playerVisual.localScale = Vector3.one;
             trail.Clear();
             cameraY = 0f;
-            nextOrbY = settings.startOrbSpacing * 0.88f; // primera esfera algo más cerca
+            nextOrbY = settings.startOrbSpacing * 0.88f; // primera estrella algo más cerca
             SpawnAhead();
             PlaceCamera(true);
         }
@@ -274,12 +281,12 @@ namespace Planetitas
 
             height = Mathf.Max(height, p.y - PlayerRadius);
 
-            // orbes
+            // estrellas de energía
             for (int i = orbs.Count - 1; i >= 0; i--)
             {
                 var o = orbs[i];
                 if (Vector2.Distance(o.position, p) < OrbPickupDistance) CollectOrb(i);
-                else if (o.position.y < cameraY - 12f) { Destroy(o.gameObject); orbs.RemoveAt(i); }
+                else if (o.position.y < cameraY - 12f) RemoveOrb(i);
             }
             SpawnAhead();
 
@@ -307,10 +314,17 @@ namespace Planetitas
             sfx.pitch = Random.Range(0.92f, 1.08f);
             sfx.PlayOneShot(orbClip);
             Burst(o.position, settings.orbColor, 10);
+            Burst(o.position, settings.sparkleColor, 8, sparkleMat);
             FloatingText(o.position, "+" + Mathf.RoundToInt(orbEnergy));
             Pop(new Vector3(1.25f, 1.25f, 1.25f), 0.15f);
-            Destroy(o.gameObject);
+            RemoveOrb(index);
+        }
+
+        void RemoveOrb(int index)
+        {
+            Destroy(orbs[index].gameObject);
             orbs.RemoveAt(index);
+            sparkles.RemoveAt(index);
         }
 
         void Lose(string reason)
@@ -335,17 +349,17 @@ namespace Planetitas
         {
             while (nextOrbY < cameraY + 18f)
             {
-                var orb = Primitive(PrimitiveType.Sphere, orbMat, null, "Orbe").transform;
-                orb.localScale = Vector3.one * 0.6f;
+                var orb = MakeEnergyStar();
                 orb.position = new Vector3(Random.Range(-arenaHalfWidth + 0.5f, arenaHalfWidth - 0.5f), nextOrbY, 0f);
                 orbs.Add(orb);
-                // los orbes se separan más cuanto más alto llegas
+                sparkles.Add(MakeSparkle(orb));
+                // las estrellas se separan más cuanto más alto llegas
                 nextOrbY += Mathf.Min(Mathf.Max(settings.startOrbSpacing, settings.maxOrbSpacing), settings.startOrbSpacing + nextOrbY * 0.02f) * Random.Range(0.85f, 1.15f);
 
                 for (int i = 0; i < 3; i++)
                 {
-                    var s = Primitive(PrimitiveType.Sphere, starMat, null, "Estrella").transform;
-                    s.localScale = Vector3.one * Random.Range(0.05f, 0.14f);
+                    var s = Primitive(PrimitiveType.Sphere, starMat, null, "EstrellaFondo").transform;
+                    s.localScale = Vector3.one * Random.Range(0.04f, 0.1f);
                     s.position = new Vector3(Random.Range(-14f, 14f), nextOrbY + Random.Range(-3f, 3f), Random.Range(6f, 14f));
                     stars.Add(s);
                 }
@@ -354,9 +368,67 @@ namespace Planetitas
                 if (stars[i].position.y < cameraY - 20f) { Destroy(stars[i].gameObject); stars.RemoveAt(i); }
         }
 
+        // ---------- estrellas de energía (XP-27) ----------
+
+        const float StarScale = 0.8f;      // tamaño base de la estrella
+        const float SquashHz = 3.5f;       // squash & stretch rápido: llama la atención
+        const float SquashAmount = 0.2f;
+
+        Transform MakeEnergyStar()
+        {
+            var go = new GameObject("EstrellaEnergia");
+            go.AddComponent<MeshFilter>().sharedMesh = starMesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = orbMat;
+            go.transform.localScale = Vector3.one * StarScale;
+            return go.transform;
+        }
+
+        ParticleSystem MakeSparkle(Transform star)
+        {
+            // pequeño destello celeste que parpadea alrededor de la estrella
+            var go = new GameObject("Destello");
+            go.transform.SetParent(star, false);
+            go.transform.localPosition = new Vector3(0f, 0f, -0.3f); // delante de la estrella
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = true;
+            main.duration = 1f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.6f);
+            main.startSpeed = 0f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.45f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 0.25f);
+            main.startColor = settings.sparkleColor;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.scalingMode = ParticleSystemScalingMode.Local; // el squash de la estrella no deforma el destello
+            main.maxParticles = 6;
+            var emission = ps.emission;
+            emission.rateOverTime = 3.5f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = 0.45f;
+            shape.radiusThickness = 0.3f; // sobre el borde de la estrella, no en el centro
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.3f, 1f), new Keyframe(1f, 0f)));
+            go.GetComponent<ParticleSystemRenderer>().sharedMaterial = sparkleMat;
+            ps.Simulate(Random.Range(0f, 1f)); // cada estrella empieza en un momento distinto
+            ps.Play();
+            return ps;
+        }
+
         void ApplyOrbLook()
         {
-            // aplica en vivo el color y el brillo elegidos en la ventana de ajustes
+            // aplica en vivo los colores y el brillo elegidos en la ventana de ajustes
+            if (settings.sparkleColor != appliedSparkleColor)
+            {
+                appliedSparkleColor = settings.sparkleColor;
+                foreach (var ps in sparkles)
+                {
+                    var main = ps.main;
+                    main.startColor = appliedSparkleColor;
+                }
+            }
             if (settings.orbColor == appliedOrbColor && Mathf.Approximately(settings.orbGlow, appliedOrbGlow)) return;
             appliedOrbColor = settings.orbColor;
             appliedOrbGlow = settings.orbGlow;
@@ -371,8 +443,13 @@ namespace Planetitas
             float t = Time.time;
             foreach (var o in orbs)
             {
-                float k = 0.6f + Mathf.Sin(t * 4f + o.position.x) * 0.06f;
-                o.localScale = Vector3.one * k;
+                float phase = o.position.x * 1.7f + o.position.y; // cada estrella con su propio ritmo
+                float s = Mathf.Sin(t * SquashHz * 2f * Mathf.PI + phase);
+                s = Mathf.Sign(s) * Mathf.Pow(Mathf.Abs(s), 0.6f); // más "snappy" que un seno
+                float stretch = 1f + s * SquashAmount;            // se estira hacia arriba...
+                float squash = 1f / Mathf.Sqrt(stretch);           // ...y adelgaza (conserva volumen)
+                o.localScale = new Vector3(squash, stretch, squash) * StarScale;
+                o.localRotation = Quaternion.Euler(0f, Mathf.Sin(t * 1.3f + phase) * 25f, Mathf.Sin(t * 0.9f + phase) * 8f);
             }
         }
 
@@ -429,7 +506,7 @@ namespace Planetitas
             }
         }
 
-        void Burst(Vector3 at, Color color, int count)
+        void Burst(Vector3 at, Color color, int count, Material material = null)
         {
             var go = new GameObject("Destello");
             go.transform.position = at;
@@ -450,8 +527,140 @@ namespace Planetitas
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Sphere;
             shape.radius = 0.2f;
-            go.GetComponent<ParticleSystemRenderer>().sharedMaterial = trailMat;
+            go.GetComponent<ParticleSystemRenderer>().sharedMaterial = material != null ? material : trailMat;
             ps.Play();
+        }
+
+        // ---------- geometría procedural ----------
+
+        /// <summary>
+        /// Estrella de 5 puntas "inflada", con las puntas redondeadas (referencia de XP-27).
+        /// La altura se obtiene "inflando" el contorno: se resuelve ∇²h = -1 con h = 0 en el borde
+        /// (como hinchar un globo con esa forma) y se usa z = √h para que el borde sea redondo.
+        /// </summary>
+        static Mesh BuildStarMesh()
+        {
+            const int segments = 100, rings = 12, iterations = 800;
+            const float outer = 0.5f, inner = 0.3f, depth = 0.22f;
+            const double omega = 1.95; // sobre-relajación: converge en pocas iteraciones
+
+            // contorno: radio según el ángulo, con una punta hacia arriba
+            var outline = new Vector2[segments];
+            for (int i = 0; i < segments; i++)
+            {
+                float a = i * 2f * Mathf.PI / segments;
+                float tip = Mathf.Pow(0.5f + 0.5f * Mathf.Cos(5f * a), 1.2f);
+                float r = Mathf.Lerp(inner, outer, tip);
+                float ang = a + Mathf.PI * 0.5f;
+                outline[i] = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * r;
+            }
+            Vector2 Pos(int k, int i) => outline[i] * ((float)k / rings);
+
+            // pesos 1/d² hacia los 4 vecinos de cada punto de la malla polar (k = anillo, i = ángulo)
+            var h = new double[rings + 1, segments];
+            var w = new double[rings, segments, 4];
+            for (int k = 1; k < rings; k++)
+                for (int i = 0; i < segments; i++)
+                {
+                    Vector2 p = Pos(k, i);
+                    w[k, i, 0] = 1.0 / (Pos(k - 1, i) - p).sqrMagnitude;
+                    w[k, i, 1] = 1.0 / (Pos(k + 1, i) - p).sqrMagnitude;
+                    w[k, i, 2] = 1.0 / (Pos(k, (i + 1) % segments) - p).sqrMagnitude;
+                    w[k, i, 3] = 1.0 / (Pos(k, (i + segments - 1) % segments) - p).sqrMagnitude;
+                }
+            double centerWeight = 0;
+            for (int i = 0; i < segments; i++) centerWeight += 1.0 / Pos(1, i).sqrMagnitude;
+
+            double center = 0;
+            for (int it = 0; it < iterations; it++)
+            {
+                double sum = 0;
+                for (int i = 0; i < segments; i++) sum += h[1, i] / Pos(1, i).sqrMagnitude;
+                center += omega * ((sum + segments) / centerWeight - center);
+                for (int i = 0; i < segments; i++) h[0, i] = center;
+
+                for (int k = 1; k < rings; k++)
+                    for (int i = 0; i < segments; i++)
+                    {
+                        int ip = (i + 1) % segments, im = (i + segments - 1) % segments;
+                        double w0 = w[k, i, 0], w1 = w[k, i, 1], w2 = w[k, i, 2], w3 = w[k, i, 3];
+                        double target = (w0 * h[k - 1, i] + w1 * h[k + 1, i] + w2 * h[k, ip] + w3 * h[k, im] + 4.0) / (w0 + w1 + w2 + w3);
+                        h[k, i] += omega * (target - h[k, i]);
+                    }
+            }
+
+            // dos caras (frente z<0 hacia la cámara, dorso z>0) que comparten el anillo del borde
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            int[] Face(float side)
+            {
+                var idx = new int[rings + 1];
+                idx[0] = verts.Count;
+                verts.Add(new Vector3(0f, 0f, side * depth));
+                for (int k = 1; k < rings; k++)
+                {
+                    idx[k] = verts.Count;
+                    for (int i = 0; i < segments; i++)
+                    {
+                        float z = side * depth * Mathf.Sqrt(Mathf.Max(0f, (float)(h[k, i] / center)));
+                        Vector2 p = Pos(k, i);
+                        verts.Add(new Vector3(p.x, p.y, z));
+                    }
+                }
+                return idx;
+            }
+            int[] front = Face(-1f), back = Face(1f);
+            int edge = verts.Count;
+            for (int i = 0; i < segments; i++) verts.Add(outline[i]);
+            front[rings] = back[rings] = edge;
+
+            void Build(int[] f, bool flip)
+            {
+                for (int i = 0; i < segments; i++)
+                {
+                    int j = (i + 1) % segments;
+                    Tri(f[0], f[1] + j, f[1] + i, flip); // abanico central
+                    for (int k = 1; k < rings; k++)
+                    {
+                        int a0 = f[k] + i, a1 = f[k] + j, b0 = f[k + 1] + i, b1 = f[k + 1] + j;
+                        Tri(a0, a1, b0, flip);
+                        Tri(a1, b1, b0, flip);
+                    }
+                }
+            }
+            void Tri(int a, int b, int c, bool flip)
+            {
+                tris.Add(a);
+                if (flip) { tris.Add(c); tris.Add(b); } else { tris.Add(b); tris.Add(c); }
+            }
+            Build(front, false);
+            Build(back, true);
+
+            var mesh = new Mesh { name = "EstrellaEnergia" };
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        /// <summary>Textura de destello de 4 puntas, blanca con alfa (se tiñe con el color del destello).</summary>
+        static Texture2D SparkleTexture()
+        {
+            const int n = 64;
+            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float u = Mathf.Abs((x + 0.5f) / n * 2f - 1f), v = Mathf.Abs((y + 0.5f) / n * 2f - 1f);
+                    float rays = Mathf.Max(Mathf.Exp(-u * 14f) * (1f - v), Mathf.Exp(-v * 14f) * (1f - u));
+                    float core = Mathf.Exp(-(u * u + v * v) * 18f);
+                    px[y * n + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(rays + core));
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
         }
 
         void FloatingText(Vector3 at, string text)

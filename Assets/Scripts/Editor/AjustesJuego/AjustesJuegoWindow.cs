@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 
 namespace Planetitas.EditorTools
 {
-    /// <summary>Ventana para ajustar el salto, la gravedad y las esferas de energía.</summary>
+    /// <summary>Ventana para ajustar el salto, la gravedad y las estrellas de energía.</summary>
     public class AjustesJuegoWindow : EditorWindow
     {
         const string Folder = "Assets/Scripts/Editor/AjustesJuego";
@@ -85,7 +85,7 @@ namespace Planetitas.EditorTools
             jumpInfo.text = $"Altura del primer salto: {first:0.0} m   ·   con impulso máximo: {max:0.0} m";
 
             SetWarning(startWarning, settings.startOrbSpacing > first,
-                $"La distancia inicial ({settings.startOrbSpacing:0.0} m) es mayor que el primer salto ({first:0.0} m): al empezar necesitarás varios saltos por esfera.");
+                $"La distancia inicial ({settings.startOrbSpacing:0.0} m) es mayor que el primer salto ({first:0.0} m): al empezar necesitarás varios saltos por estrella.");
             SetWarning(maxWarning, settings.maxOrbSpacing > max,
                 $"La distancia máxima ({settings.maxOrbSpacing:0.0} m) supera lo que sube un salto con impulso máximo ({max:0.0} m): arriba será muy difícil no quedarse sin energía.");
 

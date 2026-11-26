@@ -21,13 +21,16 @@ namespace Planetitas
         [Tooltip("Multiplicador máximo de impulso.")]
         public float maxImpulseMultiplier = 2.5f;
 
-        [Header("Esferas de energía")]
-        public Color orbColor = new Color(0x5C / 255f, 0xE1 / 255f, 0xE6 / 255f, 1f);
+        [Header("Estrellas de energía")]
+        [Tooltip("Color de las estrellas que dan energía.")]
+        public Color orbColor = new Color(0x8A / 255f, 0xA8 / 255f, 0xFF / 255f, 1f);
+        [Tooltip("Color del pequeño destello que parpadea alrededor de cada estrella.")]
+        public Color sparkleColor = new Color(0x7F / 255f, 0xF3 / 255f, 0xFF / 255f, 1f);
         [Tooltip("Intensidad del brillo (emisión).")]
         public float orbGlow = 2.5f;
-        [Tooltip("Distancia vertical entre esferas al empezar (m).")]
+        [Tooltip("Distancia vertical entre estrellas al empezar (m).")]
         public float startOrbSpacing = 2.5f;
-        [Tooltip("Distancia vertical máxima entre esferas, a la que se llega subiendo (m).")]
+        [Tooltip("Distancia vertical máxima entre estrellas, a la que se llega subiendo (m).")]
         public float maxOrbSpacing = 7f;
 
         public void ResetToDefaults()
