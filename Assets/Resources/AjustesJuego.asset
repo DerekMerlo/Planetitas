@@ -16,7 +16,8 @@ MonoBehaviour:
   gravity: 18
   impulseGrowthPerJump: 0.12
   maxImpulseMultiplier: 2.5
-  orbColor: {r: 0.36078432, g: 0.88235295, b: 0.9019608, a: 1}
+  orbColor: {r: 0.5411765, g: 0.65882355, b: 1, a: 1}
+  sparkleColor: {r: 0.49803922, g: 0.9529412, b: 1, a: 1}
   orbGlow: 4.92
   startOrbSpacing: 1.9
   maxOrbSpacing: 6.9

@@ -13,10 +13,11 @@
     </ui:VisualElement>
 
     <ui:VisualElement class="section">
-      <ui:Label text="Esferas de energía" class="section-title" />
-      <uie:ColorField name="orbColor" label="Color" binding-path="orbColor" show-alpha="false" />
+      <ui:Label text="Estrellas de energía" class="section-title" />
+      <uie:ColorField name="orbColor" label="Color" binding-path="orbColor" show-alpha="false" tooltip="Color de las estrellas que dan energía." />
+      <uie:ColorField name="sparkleColor" label="Color del destello" binding-path="sparkleColor" show-alpha="false" tooltip="Destello que parpadea alrededor de cada estrella." />
       <ui:Slider name="orbGlow" label="Brillo" binding-path="orbGlow" low-value="0" high-value="6" show-input-field="true" />
-      <ui:Slider name="startSpacing" label="Distancia inicial (m)" binding-path="startOrbSpacing" low-value="1" high-value="10" show-input-field="true" tooltip="Separación vertical entre esferas al empezar." />
+      <ui:Slider name="startSpacing" label="Distancia inicial (m)" binding-path="startOrbSpacing" low-value="1" high-value="10" show-input-field="true" tooltip="Separación vertical entre estrellas al empezar." />
       <ui:Slider name="maxSpacing" label="Distancia máxima (m)" binding-path="maxOrbSpacing" low-value="1" high-value="15" show-input-field="true" tooltip="La separación crece al subir hasta este valor." />
       <ui:HelpBox name="startWarning" message-type="Warning" class="warning hidden" />
       <ui:HelpBox name="maxWarning" message-type="Warning" class="warning hidden" />
